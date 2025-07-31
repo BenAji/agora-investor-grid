@@ -174,72 +174,23 @@ const filterEventsForUser = (events: Event[], preferences: NotificationPreferenc
   });
 };
 
-// Main function to process and send notifications
+// Main function to process and send notifications (now uses database)
 export const processEventNotifications = async (): Promise<void> => {
   console.log('🔔 Starting event notification process...');
-
+  console.log('ℹ️ Note: Notification processing is now handled by the process-notifications edge function');
+  
   try {
-    // Get all users
-    const users = await getUsersWithProfiles();
-    console.log(`📊 Found ${users.length} users to process`);
+    // Call the edge function to process notifications
+    const { data, error } = await supabase.functions.invoke('process-notifications', {
+      body: { manual: true }
+    });
 
-    for (const user of users) {
-      // Load user's notification preferences
-      const savedPreferences = localStorage.getItem(`notification_preferences_${user.id}`);
-      if (!savedPreferences) {
-        console.log(`⏭️ Skipping user ${user.id} - no notification preferences`);
-        continue;
-      }
-
-      const userPrefs = JSON.parse(savedPreferences);
-      if (!userPrefs.preferences) continue;
-
-      const enabledPreferences = userPrefs.preferences.filter((pref: NotificationPreference) => pref.enabled);
-      
-      if (enabledPreferences.length === 0) {
-        console.log(`⏭️ Skipping user ${user.id} - all notifications disabled`);
-        continue;
-      }
-
-      // Process each enabled notification type
-      for (const pref of enabledPreferences) {
-        const events = await getUpcomingEvents(pref.frequency_days);
-        const relevantEvents = filterEventsForUser(events, pref);
-
-        if (relevantEvents.length === 0) {
-          console.log(`📭 No relevant events for user ${user.id} (${pref.notification_type})`);
-          continue;
-        }
-
-        const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User';
-
-        // Send notification based on type
-        if (pref.notification_type === 'email') {
-          const htmlContent = generateEmailTemplate(relevantEvents, userName, pref.frequency_days);
-          await sendEmail(
-            user.user_id, // In production, you'd need the actual email address
-            `AGORA: ${relevantEvents.length} Upcoming Event${relevantEvents.length > 1 ? 's' : ''} in ${pref.frequency_days} Day${pref.frequency_days > 1 ? 's' : ''}`,
-            htmlContent
-          );
-        } else if (pref.notification_type === 'sms') {
-          const smsMessage = generateSMSMessage(relevantEvents, userName, pref.frequency_days);
-          await sendSMS(
-            user.user_id, // In production, you'd need the actual phone number
-            smsMessage
-          );
-        } else if (pref.notification_type === 'desktop') {
-          // Desktop notifications would be handled by the frontend
-          console.log(`🖥️ Desktop notification queued for user ${user.id}`);
-        } else if (pref.notification_type === 'mobile') {
-          // Mobile push notifications would be handled by a push service
-          console.log(`📱 Mobile notification queued for user ${user.id}`);
-        }
-
-        console.log(`✅ Sent ${pref.notification_type} notification to ${userName} for ${relevantEvents.length} events`);
-      }
+    if (error) {
+      console.error('Error calling process-notifications function:', error);
+      throw error;
     }
 
-    console.log('🎉 Event notification process completed successfully');
+    console.log('✅ Process-notifications function called successfully:', data);
   } catch (error) {
     console.error('❌ Error in notification process:', error);
     throw error;
@@ -255,37 +206,64 @@ export const scheduleEventNotifications = async (): Promise<void> => {
   await processEventNotifications();
 };
 
-// Function to send a test notification
+// Function to send a test notification (now uses edge function)
 export const sendTestNotification = async (userId: string): Promise<void> => {
   console.log(`🧪 Sending test notification to user ${userId}`);
   
-  const events = await getUpcomingEvents(7);
-  if (events.length === 0) {
-    console.log('No upcoming events found for test notification');
-    return;
+  try {
+    const events = await getUpcomingEvents(7);
+    if (events.length === 0) {
+      console.log('No upcoming events found for test notification');
+      return;
+    }
+
+    const { data: user } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (!user) {
+      console.log('User not found for test notification');
+      return;
+    }
+
+    // Call the send-notification edge function for test
+    const testNotificationData = {
+      userId: user.id,
+      notificationType: 'email',
+      events: events.slice(0, 3).map(event => ({
+        eventID: event.eventID,
+        eventName: event.eventName,
+        eventType: event.eventType,
+        hostCompany: event.hostCompany || '',
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location || '',
+        description: event.description
+      })),
+      userProfile: {
+        first_name: user.first_name,
+        last_name: user.last_name,
+        user_id: user.user_id
+      },
+      frequencyDays: 7
+    };
+
+    const { data, error } = await supabase.functions.invoke('send-notification', {
+      body: testNotificationData
+    });
+
+    if (error) {
+      console.error('Error calling send-notification function:', error);
+      throw error;
+    }
+
+    console.log('✅ Test notification sent successfully:', data);
+  } catch (error) {
+    console.error('❌ Error sending test notification:', error);
+    throw error;
   }
-
-  const { data: user } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
-  if (!user) {
-    console.log('User not found for test notification');
-    return;
-  }
-
-  const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User';
-  const htmlContent = generateEmailTemplate(events.slice(0, 3), userName, 7);
-  
-  await sendEmail(
-    user.user_id,
-    'AGORA: Test Notification - Upcoming Events',
-    htmlContent
-  );
-
-  console.log('✅ Test notification sent successfully');
 };
 
 export default {

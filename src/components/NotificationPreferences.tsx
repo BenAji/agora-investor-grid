@@ -97,19 +97,25 @@ export const NotificationPreferences: React.FC = () => {
       setCompanies(companiesResponse.data || []);
       setGicsData(gicsResponse.data || []);
 
-      // Load preferences from localStorage
-      const savedPreferences = localStorage.getItem(`notification_preferences_${profile?.id}`);
-      if (savedPreferences) {
-        const parsed = JSON.parse(savedPreferences);
-        if (parsed.preferences) {
-          updateSettingsFromPreferences(parsed.preferences);
-        }
-        if (parsed.companies) {
-          setSelectedCompanies(parsed.companies);
-        }
-        if (parsed.gicsSectors) {
-          setSelectedGicsSectors(parsed.gicsSectors);
-        }
+      // Load preferences from database
+      const { data: dbPreferences } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', profile?.id);
+
+      if (dbPreferences && dbPreferences.length > 0) {
+        const typedPreferences = dbPreferences.map(p => ({
+          ...p,
+          notification_type: p.notification_type as 'email' | 'sms' | 'desktop' | 'mobile'
+        }));
+        updateSettingsFromPreferences(typedPreferences);
+        
+        // Collect all companies and sectors from all preferences
+        const allCompanies = [...new Set(dbPreferences.flatMap(p => p.companies || []))];
+        const allSectors = [...new Set(dbPreferences.flatMap(p => p.gics_sectors || []))];
+        
+        setSelectedCompanies(allCompanies);
+        setSelectedGicsSectors(allSectors);
       }
 
       // Fetch user's current subscriptions to pre-populate company/GICS selections
@@ -184,6 +190,14 @@ export const NotificationPreferences: React.FC = () => {
     
     setSaving(true);
     try {
+      // Delete existing preferences for this user
+      const { error: deleteError } = await supabase
+        .from('notification_preferences')
+        .delete()
+        .eq('user_id', profile.id);
+
+      if (deleteError) throw deleteError;
+
       // Create notification preferences array
       const preferencesToSave = Object.entries(notificationSettings).map(([type, settings]) => ({
         user_id: profile.id,
@@ -194,14 +208,12 @@ export const NotificationPreferences: React.FC = () => {
         companies: selectedCompanies,
       }));
 
-      // For now, we'll just save to localStorage since the table might not exist
-      // In production, you'd want to create the notification_preferences table
-      localStorage.setItem(`notification_preferences_${profile.id}`, JSON.stringify({
-        preferences: preferencesToSave,
-        companies: selectedCompanies,
-        gicsSectors: selectedGicsSectors,
-        updatedAt: new Date().toISOString()
-      }));
+      // Insert new preferences into database
+      const { error: insertError } = await supabase
+        .from('notification_preferences')
+        .insert(preferencesToSave);
+
+      if (insertError) throw insertError;
 
       toast({
         title: "Preferences Saved",
