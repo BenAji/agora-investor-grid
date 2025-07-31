@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -139,7 +139,7 @@ const Auth: React.FC = () => {
         <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="flex items-center justify-center space-x-3 mb-4">
+          <Link to="/" className="flex items-center justify-center space-x-3 mb-4 hover:opacity-80 transition-opacity">
             <div className="w-12 h-12 bg-yellow-400 flex items-center justify-center">
               <span className="text-white font-bold text-xl">A</span>
             </div>
@@ -147,7 +147,7 @@ const Auth: React.FC = () => {
               <h1 className="text-2xl font-bold text-white">AGORA</h1>
               <p className="text-xs text-gray-400 uppercase tracking-wide">Event Coordination Platform</p>
             </div>
-          </div>
+          </Link>
           <p className="text-gray-300 text-sm">
             Professional event coordination platform for investment analysts
           </p>

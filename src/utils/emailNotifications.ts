@@ -228,6 +228,22 @@ export const sendTestNotification = async (userId: string): Promise<void> => {
       return;
     }
 
+    // Get the current user's email from auth
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const userEmail = authUser?.email;
+
+    console.log('🧪 Test notification details:', {
+      userId: user.id,
+      userEmail: userEmail,
+      userName: `${user.first_name} ${user.last_name}`,
+      eventsCount: events.slice(0, 3).length
+    });
+
+    if (!userEmail) {
+      console.log('User email not found for test notification');
+      return;
+    }
+
     // Call the send-notification edge function for test
     const testNotificationData = {
       userId: user.id,
@@ -245,7 +261,7 @@ export const sendTestNotification = async (userId: string): Promise<void> => {
       userProfile: {
         first_name: user.first_name,
         last_name: user.last_name,
-        user_id: user.user_id
+        user_id: userEmail // Use actual email instead of UUID
       },
       frequencyDays: 7
     };
@@ -256,7 +272,17 @@ export const sendTestNotification = async (userId: string): Promise<void> => {
 
     if (error) {
       console.error('Error calling send-notification function:', error);
-      throw error;
+      
+      // Provide specific error messages based on the error type
+      if (error.message?.includes('500')) {
+        throw new Error('Notification service is temporarily unavailable. Please try again later.');
+      } else if (error.message?.includes('401') || error.message?.includes('403')) {
+        throw new Error('Authentication failed. Please check your login status and try again.');
+      } else if (error.message?.includes('404')) {
+        throw new Error('Notification service not found. Please contact support.');
+      } else {
+        throw new Error(`Notification service error: ${error.message || 'Unknown error occurred'}`);
+      }
     }
 
     console.log('✅ Test notification sent successfully:', data);
@@ -265,6 +291,8 @@ export const sendTestNotification = async (userId: string): Promise<void> => {
     throw error;
   }
 };
+
+
 
 export default {
   processEventNotifications,

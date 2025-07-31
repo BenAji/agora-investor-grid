@@ -25,13 +25,13 @@ export const NotificationTestButton: React.FC = () => {
       await sendTestNotification(profile.id);
       toast({
         title: "Test Notification Sent",
-        description: "Check your console/logs to see the test notification output",
+        description: "Test notification sent successfully! Check your email/SMS for the notification.",
       });
     } catch (error) {
       console.error('Error sending test notification:', error);
       toast({
         title: "Test Failed",
-        description: "Failed to send test notification. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to send test notification. Please try again.",
         variant: "destructive",
       });
     } finally {
