@@ -110,35 +110,155 @@ export type Database = {
         }
         Relationships: []
       }
-      profiles: {
+      notification_log: {
         Row: {
-          company_id: string | null
-          created_at: string
-          first_name: string | null
+          created_at: string | null
+          event_id: string | null
           id: string
-          last_name: string | null
-          role: string
+          message: string | null
+          notification_type: string
+          sent_at: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          message?: string | null
+          notification_type: string
+          sent_at?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          message?: string | null
+          notification_type?: string
+          sent_at?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["eventID"]
+          },
+          {
+            foreignKeyName: "notification_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_id: string | null
+          id: string
+          message_id: string | null
+          notification_type: string
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_id?: string | null
+          id?: string
+          message_id?: string | null
+          notification_type: string
+          sent_at?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_id?: string | null
+          id?: string
+          message_id?: string | null
+          notification_type?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          companies: string[] | null
+          created_at: string
+          enabled: boolean
+          frequency_days: number
+          gics_sectors: string[] | null
+          id: string
+          notification_type: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          company_id?: string | null
+          companies?: string[] | null
           created_at?: string
-          first_name?: string | null
+          enabled?: boolean
+          frequency_days?: number
+          gics_sectors?: string[] | null
           id?: string
-          last_name?: string | null
-          role: string
+          notification_type: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          company_id?: string | null
+          companies?: string[] | null
           created_at?: string
+          enabled?: boolean
+          frequency_days?: number
+          gics_sectors?: string[] | null
+          id?: string
+          notification_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          company_id: string | null
+          createdAt: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          role: string
+          updatedAt: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          createdAt?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          role: string
+          updatedAt?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          createdAt?: string
           first_name?: string | null
           id?: string
           last_name?: string | null
           role?: string
-          updated_at?: string
+          updatedAt?: string
           user_id?: string
         }
         Relationships: [
@@ -177,6 +297,13 @@ export type Database = {
           userID?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_rsvps_userid_profiles_id"
+            columns: ["userID"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rsvps_eventID_fkey"
             columns: ["eventID"]
@@ -321,7 +448,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_missing_profiles: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       event_type:
