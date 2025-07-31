@@ -34,14 +34,14 @@ const Layout = ({ children, currentPage = 'dashboard' }: LayoutProps) => {
       <header className="bg-surface-primary border-b border-border-default">
         <div className="flex items-center justify-between px-4 py-2">
           {/* Logo */}
-          <div className="flex items-center space-x-3">
+          <Link to="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <div className="w-6 h-6 bg-gradient-gold rounded-sm flex items-center justify-center">
               <span className="text-black font-bold text-xs">A</span>
             </div>
             <div>
               <h1 className="text-sm font-bold text-gold">AGORA</h1>
             </div>
-          </div>
+          </Link>
           
           {/* Navigation */}
           <nav className="flex items-center space-x-1">

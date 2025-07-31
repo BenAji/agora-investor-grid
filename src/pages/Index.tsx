@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -47,7 +47,7 @@ const Index: React.FC = () => {
       {/* Header */}
       <header className="relative z-20 p-6 border-b border-yellow-400/30">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-3">
+          <Link to="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm flex items-center justify-center shadow-lg">
               <span className="text-black font-black text-lg">A</span>
             </div>
@@ -55,7 +55,7 @@ const Index: React.FC = () => {
               <h1 className="text-2xl font-black text-yellow-400">AGORA</h1>
               <p className="text-xs text-gray-400">Event Coordination Platform</p>
             </div>
-          </div>
+          </Link>
           <div className="flex gap-3">
             <Button 
               variant="outline" 

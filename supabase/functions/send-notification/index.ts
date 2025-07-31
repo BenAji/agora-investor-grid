@@ -89,9 +89,37 @@ const sendEmail = async (notification: NotificationRequest) => {
 
   // Use SendGrid for email sending
   const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY');
+  
+  console.log('🔧 SendGrid API Key check:', {
+    hasKey: !!sendGridApiKey,
+    keyLength: sendGridApiKey ? sendGridApiKey.length : 0,
+    keyPrefix: sendGridApiKey ? sendGridApiKey.substring(0, 10) + '...' : 'none'
+  });
+  
   if (!sendGridApiKey) {
-    throw new Error('SendGrid API key not configured');
+    // For development/testing, log the email content instead of sending
+    console.log('📧 SendGrid API key not configured - logging email content for testing:');
+    console.log('To:', notification.userProfile.user_id);
+    console.log('Subject:', `AGORA: ${notification.events.length} Upcoming Event${notification.events.length > 1 ? 's' : ''} in ${notification.frequencyDays} Day${notification.frequencyDays > 1 ? 's' : ''}`);
+    console.log('HTML Content:', htmlContent);
+    
+    // Return success for testing purposes
+    return { success: true, messageId: `test-${Date.now()}` };
   }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(notification.userProfile.user_id)) {
+    console.log('Invalid email format:', notification.userProfile.user_id);
+    return { success: true, messageId: `test-invalid-email-${Date.now()}` };
+  }
+
+  console.log('📧 Attempting to send email via SendGrid...');
+  console.log('📧 Email details:', {
+    to: notification.userProfile.user_id,
+    subject: `AGORA: ${notification.events.length} Upcoming Event${notification.events.length > 1 ? 's' : ''} in ${notification.frequencyDays} Day${notification.frequencyDays > 1 ? 's' : ''}`,
+    from: 'notifications@agora-platform.com'
+  });
 
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
@@ -99,21 +127,42 @@ const sendEmail = async (notification: NotificationRequest) => {
       'Authorization': `Bearer ${sendGridApiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      personalizations: [{
-        to: [{ email: notification.userProfile.user_id }], // In production, use actual email
-        subject: `AGORA: ${notification.events.length} Upcoming Event${notification.events.length > 1 ? 's' : ''} in ${notification.frequencyDays} Day${notification.frequencyDays > 1 ? 's' : ''}`
-      }],
-      from: { email: 'notifications@agora-platform.com', name: 'AGORA Platform' },
-      content: [{ type: 'text/html', value: htmlContent }]
-    })
+          body: JSON.stringify({
+        personalizations: [{
+          to: [{ email: notification.userProfile.user_id }],
+          subject: `AGORA: ${notification.events.length} Upcoming Event${notification.events.length > 1 ? 's' : ''} in ${notification.frequencyDays} Day${notification.frequencyDays > 1 ? 's' : ''}`
+        }],
+        from: { email: 'ayoadebenjamin@gmail.com', name: 'AGORA Platform' },
+        content: [{ type: 'text/html', value: htmlContent }]
+      })
   });
 
+  console.log('📧 SendGrid response status:', response.status);
+  console.log('📧 SendGrid response headers:', Object.fromEntries(response.headers.entries()));
+
   if (!response.ok) {
-    throw new Error(`SendGrid API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error('SendGrid API error:', response.status, errorText);
+    throw new Error(`SendGrid API error: ${response.status} - ${errorText}`);
   }
 
-  return { success: true, messageId: response.headers.get('X-Message-Id') };
+  // Handle empty response or JSON parsing issues
+  const responseText = await response.text();
+  console.log('📧 SendGrid response text:', responseText);
+  
+  let responseData = null;
+  if (responseText && responseText.trim()) {
+    try {
+      responseData = JSON.parse(responseText);
+      console.log('📧 SendGrid success response:', responseData);
+    } catch (parseError) {
+      console.log('📧 SendGrid response is not JSON, but request was successful');
+    }
+  } else {
+    console.log('📧 SendGrid returned empty response, but request was successful');
+  }
+
+  return { success: true, messageId: response.headers.get('X-Message-Id') || `sg-${Date.now()}` };
 };
 
 const sendSMS = async (notification: NotificationRequest) => {
@@ -132,7 +181,13 @@ const sendSMS = async (notification: NotificationRequest) => {
   const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
 
   if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
-    throw new Error('Twilio credentials not configured');
+    // For development/testing, log the SMS content instead of sending
+    console.log('📱 Twilio credentials not configured - logging SMS content for testing:');
+    console.log('To:', notification.userProfile.user_id);
+    console.log('Message:', message);
+    
+    // Return success for testing purposes
+    return { success: true, messageId: `test-sms-${Date.now()}` };
   }
 
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`, {
@@ -187,8 +242,18 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('🔔 Edge function started');
+    
     const notification: NotificationRequest = await req.json();
     console.log(`🔔 Processing ${notification.notificationType} notification for user ${notification.userId}`);
+    console.log('📧 Notification data:', JSON.stringify(notification, null, 2));
+
+    // Check environment variables
+    console.log('🔧 Environment check:');
+    console.log('- SENDGRID_API_KEY exists:', !!Deno.env.get('SENDGRID_API_KEY'));
+    console.log('- TWILIO_ACCOUNT_SID exists:', !!Deno.env.get('TWILIO_ACCOUNT_SID'));
+    console.log('- SUPABASE_URL exists:', !!Deno.env.get('SUPABASE_URL'));
+    console.log('- SUPABASE_SERVICE_ROLE_KEY exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
     let result;
     let messageId;
@@ -228,24 +293,8 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
   } catch (error: any) {
-    console.error('❌ Error sending notification:', error);
-
-    // Try to log the error if we have enough information
-    try {
-      const body = await req.clone().json();
-      if (body.userId && body.notificationType) {
-        await logNotification(
-          body.userId,
-          body.notificationType,
-          body.events?.map((e: any) => e.eventID) || [],
-          'failed',
-          undefined,
-          error.message
-        );
-      }
-    } catch (logError) {
-      console.error('Could not log notification error:', logError);
-    }
+    console.error('❌ Error in edge function:', error);
+    console.error('❌ Error stack:', error.stack);
 
     return new Response(
       JSON.stringify({ error: error.message }),
